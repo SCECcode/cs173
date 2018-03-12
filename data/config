@@ -1,0 +1,27 @@
+# UTM Zone
+utm_zone = 11
+
+# Model directory
+model_dir = cs173
+
+# Number of cells in x, y, and z.
+nx = 3200 
+ny = 6960 
+nz = 288 
+
+# Depth, in meters
+depth = 50400
+depth_interval = 175
+
+bottom_left_corner_e = 548969.079292
+bottom_left_corner_n = 3459243.769232
+top_left_corner_e    = -448610.671359
+top_left_corner_n    = 4157755.975881
+bottom_right_corner_e = 870071.761707
+bottom_right_corner_n = 3917825.705794
+top_right_corner_e   = -127508.133290
+top_right_corner_n   = 4616338.305196
+
+# Seek method, fast-X or fast-Y
+seek_axis = fast-Y
+seek_direction = top-down
