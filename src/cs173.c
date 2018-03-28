@@ -249,7 +249,7 @@ void read_properties(int x, int y, int z, cs173_properties_t *data) {
                 if(strcmp(configuration->seek_direction, "bottom-up") == 0) { 
  		    location = ((long)z * configuration->nx * configuration->ny) + (y * configuration->nx) + x;
                     } else { // bottom-up
- 		        location = ((long)(configuration->nz - z) * configuration->nx * configuration->ny) + (y * configuration->nx) + x;
+ 		        location = ((long)((configuration->nz -1)- z) * configuration->nx * configuration->ny) + (y * configuration->nx) + x;
                 }
             }
         }
