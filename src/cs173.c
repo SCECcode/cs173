@@ -368,10 +368,8 @@ int cs173_finalize() {
 	pj_free(cs173_latlon);
 	pj_free(cs173_utm);
 
-	if (velocity_model->vs) free(velocity_model->vs);
-	if (velocity_model->vp) free(velocity_model->vp);
-
-	free(configuration);
+        if (velocity_model) free(velocity_model);
+	if (configuration) free(configuration);
 
 	return SUCCESS;
 }
