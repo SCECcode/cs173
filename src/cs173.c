@@ -29,21 +29,21 @@ int cs173_init(const char *dir, const char *label) {
 	double north_height_m = 0, east_width_m = 0, rotation_angle = 0;
 
 	// Initialize variables.
-	configuration = calloc(1, sizeof(cs173_configuration_t));
-	velocity_model = calloc(1, sizeof(cs173_model_t));
+	cs173_configuration = calloc(1, sizeof(cs173_configuration_t));
+	cs173_velocity_model = calloc(1, sizeof(cs173_model_t));
 
 	// Configuration file location.
 	sprintf(configbuf, "%s/model/%s/data/config", dir, label);
 
-	// Read the configuration file.
-	if (read_configuration(configbuf, configuration) != SUCCESS)
+	// Read the cs173_configuration file.
+	if (read_cs173_configuration(configbuf, cs173_configuration) != SUCCESS)
 		return FAIL;
 
 	// Set up the iteration directory.
-	sprintf(iteration_directory, "%s/model/%s/data/%s/", dir, label, configuration->model_dir);
+	sprintf(cs173_iteration_directory, "%s/model/%s/data/%s/", dir, label, cs173_configuration->model_dir);
 
 	// Can we allocate the model, or parts of it, to memory. If so, we do.
-	tempVal = try_reading_model(velocity_model);
+	tempVal = try_reading_model(cs173_velocity_model);
 
 	if (tempVal == SUCCESS) {
 		fprintf(stderr, "WARNING: Could not load model into memory. Reading the model from the\n");
@@ -69,8 +69,8 @@ int cs173_init(const char *dir, const char *label) {
 	// the X and Y axis determines which grid points we use for the interpolation routine.
 
 	// Calculate the rotation angle of the box.
-	north_height_m = configuration->top_left_corner_n - configuration->bottom_left_corner_n;
-	east_width_m = configuration->top_left_corner_e - configuration->bottom_left_corner_e;
+	north_height_m = cs173_configuration->top_left_corner_n - cs173_configuration->bottom_left_corner_n;
+	east_width_m = cs173_configuration->top_left_corner_e - cs173_configuration->bottom_left_corner_e;
 
 	// Rotation angle. Cos, sin, and tan are expensive computationally, so calculate once.
 	rotation_angle = atan(east_width_m / north_height_m);
@@ -78,13 +78,13 @@ int cs173_init(const char *dir, const char *label) {
 	cos_rotation_angle = cos(rotation_angle);
 	sin_rotation_angle = sin(rotation_angle);
 
-	total_height_m = sqrt(pow(configuration->top_left_corner_n - configuration->bottom_left_corner_n, 2.0f) +
-						  pow(configuration->top_left_corner_e - configuration->bottom_left_corner_e, 2.0f));
-	total_width_m  = sqrt(pow(configuration->top_right_corner_n - configuration->top_left_corner_n, 2.0f) +
-						  pow(configuration->top_right_corner_e - configuration->top_left_corner_e, 2.0f));
+	total_height_m = sqrt(pow(cs173_configuration->top_left_corner_n - cs173_configuration->bottom_left_corner_n, 2.0f) +
+						  pow(cs173_configuration->top_left_corner_e - cs173_configuration->bottom_left_corner_e, 2.0f));
+	total_width_m  = sqrt(pow(cs173_configuration->top_right_corner_n - cs173_configuration->top_left_corner_n, 2.0f) +
+						  pow(cs173_configuration->top_right_corner_e - cs173_configuration->top_left_corner_e, 2.0f));
 
 	// Let everyone know that we are initialized and ready for business.
-	is_initialized = 1;
+	cs173_is_initialized = 1;
 
 	return SUCCESS;
 }
@@ -115,7 +115,7 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 	cs173_properties_t surrounding_points[8];
 
 //MEI, original->	int zone = 10;
-	int zone = configuration->utm_zone;
+	int zone = cs173_configuration->utm_zone;
 	int longlat2utm = 0;
 
 	for (i = 0; i < numpoints; i++) {
@@ -146,8 +146,8 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
                 point_utm_n = temp_n;
 
 		// Point within rectangle.
-		point_utm_n -= configuration->bottom_left_corner_n;
-		point_utm_e -= configuration->bottom_left_corner_e;
+		point_utm_n -= cs173_configuration->bottom_left_corner_n;
+		point_utm_e -= cs173_configuration->bottom_left_corner_e;
 
 		temp_e = point_utm_e;
 		temp_n = point_utm_n;
@@ -157,15 +157,15 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 		point_utm_n = sin_rotation_angle * temp_e + cos_rotation_angle * temp_n;
 
 		// Which point base point does that correspond to?
-		load_x_coord = round(point_utm_e / total_width_m * (configuration->nx - 1));
-		load_y_coord = round(point_utm_n / total_height_m * (configuration->ny - 1));
+		load_x_coord = round(point_utm_e / total_width_m * (cs173_configuration->nx - 1));
+		load_y_coord = round(point_utm_n / total_height_m * (cs173_configuration->ny - 1));
 
 		// And on the Z-axis?
-		load_z_coord = (configuration->depth / configuration->depth_interval - 1) -
-					   floor(points[i].depth / configuration->depth_interval);
+		load_z_coord = (cs173_configuration->depth / cs173_configuration->depth_interval - 1) -
+					   floor(points[i].depth / cs173_configuration->depth_interval);
 
 		// Are we outside the model's X and Y boundaries?
-		if (load_x_coord > configuration->nx - 2 || load_y_coord > configuration->ny - 2 || load_x_coord < 0 || load_y_coord < 0) {
+		if (load_x_coord > cs173_configuration->nx - 2 || load_y_coord > cs173_configuration->ny - 2 || load_x_coord < 0 || load_y_coord < 0) {
 			data[i].vp = -1;
 			data[i].vs = -1;
 			data[i].rho = -1;
@@ -175,9 +175,9 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 		}
 
 		// Get the X, Y, and Z percentages for the bilinear or trilinear interpolation below.
-		x_percent = fmod(point_utm_e, total_width_m / configuration->nx) / (total_width_m / configuration->nx);
-		y_percent = fmod(point_utm_n, total_height_m / configuration->ny) / (total_height_m / configuration->ny);
-		z_percent = fmod(points[i].depth, configuration->depth_interval) / configuration->depth_interval;
+		x_percent = fmod(point_utm_e, total_width_m / cs173_configuration->nx) / (total_width_m / cs173_configuration->nx);
+		y_percent = fmod(point_utm_n, total_height_m / cs173_configuration->ny) / (total_height_m / cs173_configuration->ny);
+		z_percent = fmod(points[i].depth, cs173_configuration->depth_interval) / cs173_configuration->depth_interval;
 
 		if (load_z_coord < 1) {
 			// We're below the model boundaries. Bilinearly interpolate the bottom plane and use that value.
@@ -235,33 +235,33 @@ void read_properties(int x, int y, int z, cs173_properties_t *data) {
         long location = 0;
 
         // the z is inverted at line #145
-        if ( strcmp(configuration->seek_axis, "fast-y") == 0 ||
-                 strcmp(configuration->seek_axis, "fast-Y") == 0 ) { // fast-y,  cs173 
-            if(strcmp(configuration->seek_direction, "bottom-up") == 0) { 
-	        location = ((long) z * configuration->nx * configuration->ny) + (x * configuration->ny) + y;
+        if ( strcmp(cs173_configuration->seek_axis, "fast-y") == 0 ||
+                 strcmp(cs173_configuration->seek_axis, "fast-Y") == 0 ) { // fast-y,  cs173 
+            if(strcmp(cs173_configuration->seek_direction, "bottom-up") == 0) { 
+	        location = ((long) z * cs173_configuration->nx * cs173_configuration->ny) + (x * cs173_configuration->ny) + y;
                 } else {
                     // nz starts from 0 up to nz-1
-	            location = ((long)((configuration->nz -1) - z) * configuration->nx * configuration->ny) + (x * configuration->ny) + y;
+	            location = ((long)((cs173_configuration->nz -1) - z) * cs173_configuration->nx * cs173_configuration->ny) + (x * cs173_configuration->ny) + y;
             }
         } else {  // fast-X, cca data
-            if ( strcmp(configuration->seek_axis, "fast-x") == 0 ||
-                     strcmp(configuration->seek_axis, "fast-X") == 0 ) { // fast-y,  cs173 
-                if(strcmp(configuration->seek_direction, "bottom-up") == 0) { 
- 		    location = ((long)z * configuration->nx * configuration->ny) + (y * configuration->nx) + x;
+            if ( strcmp(cs173_configuration->seek_axis, "fast-x") == 0 ||
+                     strcmp(cs173_configuration->seek_axis, "fast-X") == 0 ) { // fast-y,  cs173 
+                if(strcmp(cs173_configuration->seek_direction, "bottom-up") == 0) { 
+ 		    location = ((long)z * cs173_configuration->nx * cs173_configuration->ny) + (y * cs173_configuration->nx) + x;
                     } else { // bottom-up
- 		        location = ((long)((configuration->nz -1)- z) * configuration->nx * configuration->ny) + (y * configuration->nx) + x;
+ 		        location = ((long)(cs173_configuration->nz - z) * cs173_configuration->nx * cs173_configuration->ny) + (y * cs173_configuration->nx) + x;
                 }
             }
         }
 
 	// Check our loaded components of the model.
-	if (velocity_model->vs_status == 2) {
+	if (cs173_velocity_model->vs_status == 2) {
 		// Read from memory.
-		ptr = (float *)velocity_model->vs;
+		ptr = (float *)cs173_velocity_model->vs;
 		data->vs = ptr[location];
-	} else if (velocity_model->vs_status == 1) {
+	} else if (cs173_velocity_model->vs_status == 1) {
 		// Read from file.
-		fp = (FILE *)velocity_model->vs;
+		fp = (FILE *)cs173_velocity_model->vs;
 		fseek(fp, location * sizeof(float), SEEK_SET);
                 float temp;
 		fread(&(temp), sizeof(float), 1, fp);
@@ -269,13 +269,13 @@ void read_properties(int x, int y, int z, cs173_properties_t *data) {
 	}
 
 	// Check our loaded components of the model.
-	if (velocity_model->vp_status == 2) {
+	if (cs173_velocity_model->vp_status == 2) {
 		// Read from memory.
-		ptr = (float *)velocity_model->vp;
+		ptr = (float *)cs173_velocity_model->vp;
 		data->vp = ptr[location];
-	} else if (velocity_model->vp_status == 1) {
+	} else if (cs173_velocity_model->vp_status == 1) {
 		// Read from file.
-		fp = (FILE *)velocity_model->vp;
+		fp = (FILE *)cs173_velocity_model->vp;
 		fseek(fp, location * sizeof(float), SEEK_SET);
                 float temp;
 		fread(&(temp), sizeof(float), 1, fp);
@@ -283,13 +283,13 @@ void read_properties(int x, int y, int z, cs173_properties_t *data) {
 	}
 
 	// Check our loaded components of the model.
-	if (velocity_model->rho_status == 2) {
+	if (cs173_velocity_model->rho_status == 2) {
 		// Read from memory.
-		ptr = (float *)velocity_model->rho;
+		ptr = (float *)cs173_velocity_model->rho;
 		data->rho = ptr[location];
-	} else if (velocity_model->rho_status == 1) {
+	} else if (cs173_velocity_model->rho_status == 1) {
 		// Read from file.
-		fp = (FILE *)velocity_model->rho;
+		fp = (FILE *)cs173_velocity_model->rho;
 		fseek(fp, location * sizeof(float), SEEK_SET);
                 float temp;
 		fread(&(temp), sizeof(float), 1, fp);
@@ -368,8 +368,8 @@ int cs173_finalize() {
 	pj_free(cs173_latlon);
 	pj_free(cs173_utm);
 
-        if (velocity_model) free(velocity_model);
-	if (configuration) free(configuration);
+	if (cs173_velocity_model) free(cs173_velocity_model);
+	if (cs173_configuration) free(cs173_configuration);
 
 	return SUCCESS;
 }
@@ -394,15 +394,15 @@ int cs173_version(char *ver, int len)
 }
 
 /**
- * Reads the configuration file describing the various properties of CVM-S5 and populates
- * the configuration struct. This assumes configuration has been "calloc'ed" and validates
+ * Reads the cs173_configuration file describing the various properties of CVM-S5 and populates
+ * the cs173_configuration struct. This assumes cs173_configuration has been "calloc'ed" and validates
  * that each value is not zero at the end.
  *
- * @param file The configuration file location on disk to read.
- * @param config The configuration struct to which the data should be written.
+ * @param file The cs173_configuration file location on disk to read.
+ * @param config The cs173_configuration struct to which the data should be written.
  * @return Success or failure, depending on if file was read successfully.
  */
-int read_configuration(char *file, cs173_configuration_t *config) {
+int read_cs173_configuration(char *file, cs173_configuration_t *config) {
 	FILE *fp = fopen(file, "r");
 	char key[40];
 	char value[80];
@@ -410,11 +410,11 @@ int read_configuration(char *file, cs173_configuration_t *config) {
 
 	// If our file pointer is null, an error has occurred. Return fail.
 	if (fp == NULL) {
-		print_error("Could not open the configuration file.");
+		print_error("Could not open the cs173_configuration file.");
 		return FAIL;
 	}
 
-	// Read the lines in the configuration file.
+	// Read the lines in the cs173_configuration file.
 	while (fgets(line_holder, sizeof(line_holder), fp) != NULL) {
 		if (line_holder[0] != '#' && line_holder[0] != ' ' && line_holder[0] != '\n') {
 			sscanf(line_holder, "%s = %s", key, value);
@@ -440,14 +440,14 @@ int read_configuration(char *file, cs173_configuration_t *config) {
 		}
 	}
 
-	// Have we set up all configuration parameters?
+	// Have we set up all cs173_configuration parameters?
 	if (config->utm_zone == 0 || config->nx == 0 || config->ny == 0 || config->nz == 0 || config->model_dir[0] == '\0' || 
 		config->seek_direction[0] == '\0' || config->seek_axis[0] == '\0' ||
 		config->top_left_corner_e == 0 || config->top_left_corner_n == 0 || config->top_right_corner_e == 0 ||
 		config->top_right_corner_n == 0 || config->bottom_left_corner_e == 0 || config->bottom_left_corner_n == 0 ||
 		config->bottom_right_corner_e == 0 || config->bottom_right_corner_n == 0 || config->depth == 0 ||
 		config->depth_interval == 0) {
-		print_error("One configuration parameter not specified. Please check your configuration file.");
+		print_error("One cs173_configuration parameter not specified. Please check your cs173_configuration file.");
 		return FAIL;
 	}
 
@@ -474,7 +474,7 @@ void print_error(char *err) {
  *
  */
 int too_big() {
-        long max_size= (long) (configuration->nx) * configuration->ny * configuration->nz;
+        long max_size= (long) (cs173_configuration->nx) * cs173_configuration->ny * cs173_configuration->nz;
         long delta= max_size - INT_MAX;
 
 	if( delta > 0) {
@@ -492,14 +492,14 @@ int too_big() {
  * is not in memory, FAIL if no file found.
  */
 int try_reading_model(cs173_model_t *model) {
-	double base_malloc = configuration->nx * configuration->ny * configuration->nz * sizeof(float);
+	double base_malloc = cs173_configuration->nx * cs173_configuration->ny * cs173_configuration->nz * sizeof(float);
 	int file_count = 0;
 	int all_read_to_memory =0;
 	char current_file[128];
 	FILE *fp;
 
 	// Let's see what data we actually have.
-	sprintf(current_file, "%s/vp.dat", iteration_directory);
+	sprintf(current_file, "%s/vp.dat", cs173_iteration_directory);
 	if (access(current_file, R_OK) == 0) {
                 if( !too_big() ) { // only if fit
 		    model->vp = malloc(base_malloc);
@@ -521,7 +521,7 @@ int try_reading_model(cs173_model_t *model) {
 		file_count++;
 	}
 
-	sprintf(current_file, "%s/vs.dat", iteration_directory);
+	sprintf(current_file, "%s/vs.dat", cs173_iteration_directory);
 	if (access(current_file, R_OK) == 0) {
                 if( !too_big( )) { // only if fit
 		    model->vs = malloc(base_malloc);
@@ -543,7 +543,7 @@ int try_reading_model(cs173_model_t *model) {
 		file_count++;
 	}
 
-	sprintf(current_file, "%s/density.dat", iteration_directory);
+	sprintf(current_file, "%s/density.dat", cs173_iteration_directory);
 	if (access(current_file, R_OK) == 0) {
                 if(!too_big() ) { // only if fit
 		    model->rho = malloc(base_malloc);
@@ -565,7 +565,7 @@ int try_reading_model(cs173_model_t *model) {
 		file_count++;
 	}
 
-	sprintf(current_file, "%s/qp.dat", iteration_directory);
+	sprintf(current_file, "%s/qp.dat", cs173_iteration_directory);
 	if (access(current_file, R_OK) == 0) {
                 if( !too_big() ) { // only if fit
 		    model->qp = malloc(base_malloc);
@@ -587,7 +587,7 @@ int try_reading_model(cs173_model_t *model) {
 		file_count++;
 	}
 
-	sprintf(current_file, "%s/qs.dat", iteration_directory);
+	sprintf(current_file, "%s/qs.dat", cs173_iteration_directory);
 	if (access(current_file, R_OK) == 0) {
                 if( !too_big() ) { // only if fit
 		    model->qs = malloc(base_malloc);
@@ -661,5 +661,21 @@ int model_finalize() {
 int model_version(char *ver, int len) {
 	return cs173_version(ver, len);
 }
+
+
+int (*get_model_init())(const char *, const char *) {
+        return &cs173_init;
+}
+int (*get_model_query())(cs173_point_t *, cs173_properties_t *, int) {
+         return &cs173_query;
+}
+int (*get_model_finalize())() {
+         return &cs173_finalize;
+}
+int (*get_model_version())(char *, int) {
+         return &cs173_version;
+}
+
+
 
 #endif

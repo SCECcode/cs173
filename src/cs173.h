@@ -122,15 +122,15 @@ const char *version_string = "CS173";
 
 // Variables
 /** Set to 1 when the model is ready for query. */
-int is_initialized = 0;
+int cs173_is_initialized = 0;
 
 /** Location of En-Jui's latest iteration files. */
-char iteration_directory[128];
+char cs173_iteration_directory[128];
 
 /** Configuration parameters. */
-cs173_configuration_t *configuration;
+cs173_configuration_t *cs173_configuration;
 /** Holds pointers to the velocity model data OR indicates it can be read from file. */
-cs173_model_t *velocity_model;
+cs173_model_t *cs173_velocity_model;
 
 /** Proj.4 latitude longitude, WGS84 projection holder. */
 projPJ cs173_latlon;
@@ -159,6 +159,12 @@ int model_finalize();
 int model_version(char *ver, int len);
 /** Queries the model */
 int model_query(cs173_point_t *points, cs173_properties_t *data, int numpts);
+
+int (*get_model_init())(const char *, const char *);
+int (*get_model_query())(cs173_point_t *, cs173_properties_t *, int);
+int (*get_model_finalize())();
+int (*get_model_version())(char *, int);
+
 
 #endif
 
