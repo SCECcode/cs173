@@ -12,9 +12,9 @@ import subprocess
 model = "CS173"
 
 def usage():
-    print("\n./make_data_files.py -d [cs173]\n\n")
-    print("-d - dataset to retrieve from hypocenter.\n\n")
-    print("-u - username to use to do the dataset retrieval.\n\n")
+    print("\n./make_data_files.py -d [cs173] -u [uid]\n\n")
+    print("-d - dataset to retrieve from hypocenter.\n")
+    print("-u - username to use to do the dataset retrieval.\n")
     sys.exit(0)
 
 def main():
