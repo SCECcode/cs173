@@ -157,8 +157,8 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 		point_utm_n = sin_rotation_angle * temp_e + cos_rotation_angle * temp_n;
 
 		// Which point base point does that correspond to?
-		load_x_coord = round(point_utm_e / total_width_m * (cs173_configuration->nx - 1));
-		load_y_coord = round(point_utm_n / total_height_m * (cs173_configuration->ny - 1));
+		load_x_coord = floor(point_utm_e / total_width_m * (cs173_configuration->nx - 1));
+		load_y_coord = floor(point_utm_n / total_height_m * (cs173_configuration->ny - 1));
 
 		// And on the Z-axis?
 		load_z_coord = (cs173_configuration->depth / cs173_configuration->depth_interval - 1) -
@@ -175,9 +175,14 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 		}
 
 		// Get the X, Y, and Z percentages for the bilinear or trilinear interpolation below.
-		x_percent = fmod(point_utm_e, total_width_m / cs173_configuration->nx) / (total_width_m / cs173_configuration->nx);
-		y_percent = fmod(point_utm_n, total_height_m / cs173_configuration->ny) / (total_height_m / cs173_configuration->ny);
-		z_percent = fmod(points[i].depth, cs173_configuration->depth_interval) / cs173_configuration->depth_interval;
+		double x_interval=(cs173_configuration->nx > 1) ?
+                     total_width_m / (cs173_configuration->nx-1):total_width_m;
+                double y_interval=(cs173_configuration->ny > 1) ?
+                     total_height_m / (cs173_configuration->ny-1):total_height_m;
+
+                x_percent = fmod(point_utm_e, x_interval) / x_interval;
+                y_percent = fmod(point_utm_n, y_interval) / y_interval;
+                z_percent = fmod(points[i].depth, cs173_configuration->depth_interval) / cs173_configuration->depth_interval;
 
 		if (load_z_coord < 1) {
 			// We're below the model boundaries. Bilinearly interpolate the bottom plane and use that value.
