@@ -49,17 +49,17 @@ int cs173_init(const char *dir, const char *label) {
 		fprintf(stderr, "WARNING: Could not load model into memory. Reading the model from the\n");
 		fprintf(stderr, "hard disk may result in slow performance.\n");
 	} else if (tempVal == FAIL) {
-		print_error("No model file was found to read from.");
+		cs173_print_error("No model file was found to read from.");
 		return FAIL;
 	}
 
 	// We need to convert the point from lat, lon to UTM, let's set it up.
 	if (!(cs173_latlon = pj_init_plus("+proj=latlong +datum=WGS84"))) {
-		print_error("Could not set up latitude and longitude projection.");
+		cs173_print_error("Could not set up latitude and longitude projection.");
 		return FAIL;
 	}
 	if (!(cs173_utm = pj_init_plus("+proj=utm +zone=11 +ellps=clrk66 +datum=NAD27 +units=m +no_defs"))) {
-		print_error("Could not set up UTM projection.");
+		cs173_print_error("Could not set up UTM projection.");
 		return FAIL;
 	}
 
@@ -75,12 +75,12 @@ int cs173_init(const char *dir, const char *label) {
 	// Rotation angle. Cos, sin, and tan are expensive computationally, so calculate once.
 	rotation_angle = atan(east_width_m / north_height_m);
 
-	cos_rotation_angle = cos(rotation_angle);
-	sin_rotation_angle = sin(rotation_angle);
+	cs173_cos_rotation_angle = cos(rotation_angle);
+	cs173_sin_rotation_angle = sin(rotation_angle);
 
-	total_height_m = sqrt(pow(cs173_configuration->top_left_corner_n - cs173_configuration->bottom_left_corner_n, 2.0f) +
+	cs173_total_height_m = sqrt(pow(cs173_configuration->top_left_corner_n - cs173_configuration->bottom_left_corner_n, 2.0f) +
 						  pow(cs173_configuration->top_left_corner_e - cs173_configuration->bottom_left_corner_e, 2.0f));
-	total_width_m  = sqrt(pow(cs173_configuration->top_right_corner_n - cs173_configuration->top_left_corner_n, 2.0f) +
+	cs173_total_width_m  = sqrt(pow(cs173_configuration->top_right_corner_n - cs173_configuration->top_left_corner_n, 2.0f) +
 						  pow(cs173_configuration->top_right_corner_e - cs173_configuration->top_left_corner_e, 2.0f));
 
 	// Let everyone know that we are initialized and ready for business.
@@ -153,12 +153,12 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 		temp_n = point_utm_n;
 
 		// We need to rotate that point, the number of degrees we calculated above.
-		point_utm_e = cos_rotation_angle * temp_e - sin_rotation_angle * temp_n;
-		point_utm_n = sin_rotation_angle * temp_e + cos_rotation_angle * temp_n;
+		point_utm_e = cs173_cos_rotation_angle * temp_e - cs173_sin_rotation_angle * temp_n;
+		point_utm_n = cs173_sin_rotation_angle * temp_e + cs173_cos_rotation_angle * temp_n;
 
 		// Which point base point does that correspond to?
-		load_x_coord = floor(point_utm_e / total_width_m * (cs173_configuration->nx - 1));
-		load_y_coord = floor(point_utm_n / total_height_m * (cs173_configuration->ny - 1));
+		load_x_coord = floor(point_utm_e / cs173_total_width_m * (cs173_configuration->nx - 1));
+		load_y_coord = floor(point_utm_n / cs173_total_height_m * (cs173_configuration->ny - 1));
 
 		// And on the Z-axis?
 		load_z_coord = (cs173_configuration->depth / cs173_configuration->depth_interval - 1) -
@@ -176,9 +176,9 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 
 		// Get the X, Y, and Z percentages for the bilinear or trilinear interpolation below.
 		double x_interval=(cs173_configuration->nx > 1) ?
-                     total_width_m / (cs173_configuration->nx-1):total_width_m;
+                     cs173_total_width_m / (cs173_configuration->nx-1):cs173_total_width_m;
                 double y_interval=(cs173_configuration->ny > 1) ?
-                     total_height_m / (cs173_configuration->ny-1):total_height_m;
+                     cs173_total_height_m / (cs173_configuration->ny-1):cs173_total_height_m;
 
                 x_percent = fmod(point_utm_e, x_interval) / x_interval;
                 y_percent = fmod(point_utm_n, y_interval) / y_interval;
@@ -194,16 +194,16 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 			continue;
 		} else {
 			// Read all the surrounding point properties.
-			read_properties(load_x_coord,     load_y_coord,     load_z_coord,     &(surrounding_points[0]));	// Orgin.
-			read_properties(load_x_coord + 1, load_y_coord,     load_z_coord,     &(surrounding_points[1]));	// Orgin + 1x
-			read_properties(load_x_coord,     load_y_coord + 1, load_z_coord,     &(surrounding_points[2]));	// Orgin + 1y
-			read_properties(load_x_coord + 1, load_y_coord + 1, load_z_coord,     &(surrounding_points[3]));	// Orgin + x + y, forms top plane.
-			read_properties(load_x_coord,     load_y_coord,     load_z_coord - 1, &(surrounding_points[4]));	// Bottom plane origin
-			read_properties(load_x_coord + 1, load_y_coord,     load_z_coord - 1, &(surrounding_points[5]));	// +1x
-			read_properties(load_x_coord,     load_y_coord + 1, load_z_coord - 1, &(surrounding_points[6]));	// +1y
-			read_properties(load_x_coord + 1, load_y_coord + 1, load_z_coord - 1, &(surrounding_points[7]));	// +x +y, forms bottom plane.
+			cs173_read_properties(load_x_coord,     load_y_coord,     load_z_coord,     &(surrounding_points[0]));	// Orgin.
+			cs173_read_properties(load_x_coord + 1, load_y_coord,     load_z_coord,     &(surrounding_points[1]));	// Orgin + 1x
+			cs173_read_properties(load_x_coord,     load_y_coord + 1, load_z_coord,     &(surrounding_points[2]));	// Orgin + 1y
+			cs173_read_properties(load_x_coord + 1, load_y_coord + 1, load_z_coord,     &(surrounding_points[3]));	// Orgin + x + y, forms top plane.
+			cs173_read_properties(load_x_coord,     load_y_coord,     load_z_coord - 1, &(surrounding_points[4]));	// Bottom plane origin
+			cs173_read_properties(load_x_coord + 1, load_y_coord,     load_z_coord - 1, &(surrounding_points[5]));	// +1x
+			cs173_read_properties(load_x_coord,     load_y_coord + 1, load_z_coord - 1, &(surrounding_points[6]));	// +1y
+			cs173_read_properties(load_x_coord + 1, load_y_coord + 1, load_z_coord - 1, &(surrounding_points[7]));	// +x +y, forms bottom plane.
 
-			trilinear_interpolation(x_percent, y_percent, z_percent, surrounding_points, &(data[i]));
+			cs173_trilinear_interpolation(x_percent, y_percent, z_percent, surrounding_points, &(data[i]));
 		}
 
 		// Calculate Qp and Qs.
@@ -227,7 +227,7 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
  * @param z The z coordinate of the data point.
  * @param data The properties struct to which the material properties will be written.
  */
-void read_properties(int x, int y, int z, cs173_properties_t *data) {
+void cs173_read_properties(int x, int y, int z, cs173_properties_t *data) {
 	// Set everything to -1 to indicate not found.
 	data->vp = -1;
 	data->vs = -1;
@@ -312,21 +312,21 @@ void read_properties(int x, int y, int z, cs173_properties_t *data) {
  * @param eight_points Eight surrounding data properties
  * @param ret_properties Returned data properties
  */
-void trilinear_interpolation(double x_percent, double y_percent, double z_percent,
+void cs173_trilinear_interpolation(double x_percent, double y_percent, double z_percent,
 							 cs173_properties_t *eight_points, cs173_properties_t *ret_properties) {
 	cs173_properties_t *temp_array = calloc(2, sizeof(cs173_properties_t));
 	cs173_properties_t *four_points = eight_points;
 
-	bilinear_interpolation(x_percent, y_percent, four_points, &temp_array[0]);
+	cs173_bilinear_interpolation(x_percent, y_percent, four_points, &temp_array[0]);
 
 	// Now advance the pointer four "cvms5_properties_t" spaces.
 	four_points += 4;
 
 	// Another interpolation.
-	bilinear_interpolation(x_percent, y_percent, four_points, &temp_array[1]);
+	cs173_bilinear_interpolation(x_percent, y_percent, four_points, &temp_array[1]);
 
 	// Now linearly interpolate between the two.
-	linear_interpolation(z_percent, &temp_array[0], &temp_array[1], ret_properties);
+	cs173_linear_interpolation(z_percent, &temp_array[0], &temp_array[1], ret_properties);
 
 	free(temp_array);
 }
@@ -340,11 +340,11 @@ void trilinear_interpolation(double x_percent, double y_percent, double z_percen
  * @param four_points Data property plane.
  * @param ret_properties Returned data properties.
  */
-void bilinear_interpolation(double x_percent, double y_percent, cs173_properties_t *four_points, cs173_properties_t *ret_properties) {
+void cs173_bilinear_interpolation(double x_percent, double y_percent, cs173_properties_t *four_points, cs173_properties_t *ret_properties) {
 	cs173_properties_t *temp_array = calloc(2, sizeof(cs173_properties_t));
-	linear_interpolation(x_percent, &four_points[0], &four_points[1], &temp_array[0]);
-	linear_interpolation(x_percent, &four_points[2], &four_points[3], &temp_array[1]);
-	linear_interpolation(y_percent, &temp_array[0], &temp_array[1], ret_properties);
+	cs173_linear_interpolation(x_percent, &four_points[0], &four_points[1], &temp_array[0]);
+	cs173_linear_interpolation(x_percent, &four_points[2], &four_points[3], &temp_array[1]);
+	cs173_linear_interpolation(y_percent, &temp_array[0], &temp_array[1], ret_properties);
 	free(temp_array);
 }
 
@@ -356,7 +356,7 @@ void bilinear_interpolation(double x_percent, double y_percent, cs173_properties
  * @param x1 Data point at x1.
  * @param ret_properties Resulting data properties.
  */
-void linear_interpolation(double percent, cs173_properties_t *x0, cs173_properties_t *x1, cs173_properties_t *ret_properties) {
+void cs173_linear_interpolation(double percent, cs173_properties_t *x0, cs173_properties_t *x1, cs173_properties_t *ret_properties) {
 	ret_properties->vp  = (1 - percent) * x0->vp  + percent * x1->vp;
 	ret_properties->vs  = (1 - percent) * x0->vs  + percent * x1->vs;
 	ret_properties->rho = (1 - percent) * x0->rho + percent * x1->rho;
@@ -389,12 +389,12 @@ int cs173_finalize() {
 int cs173_version(char *ver, int len)
 {
   int verlen;
-  verlen = strlen(version_string);
+  verlen = strlen(cs173_version_string);
   if (verlen > len - 1) {
     verlen = len - 1;
   }
   memset(ver, 0, len);
-  strncpy(ver, version_string, verlen);
+  strncpy(ver, cs173_version_string, verlen);
   return 0;
 }
 
@@ -415,7 +415,7 @@ int read_cs173_configuration(char *file, cs173_configuration_t *config) {
 
 	// If our file pointer is null, an error has occurred. Return fail.
 	if (fp == NULL) {
-		print_error("Could not open the cs173_configuration file.");
+		cs173_print_error("Could not open the cs173_configuration file.");
 		return FAIL;
 	}
 
@@ -452,7 +452,7 @@ int read_cs173_configuration(char *file, cs173_configuration_t *config) {
 		config->top_right_corner_n == 0 || config->bottom_left_corner_e == 0 || config->bottom_left_corner_n == 0 ||
 		config->bottom_right_corner_e == 0 || config->bottom_right_corner_n == 0 || config->depth == 0 ||
 		config->depth_interval == 0) {
-		print_error("One cs173_configuration parameter not specified. Please check your cs173_configuration file.");
+		cs173_print_error("One cs173_configuration parameter not specified. Please check your cs173_configuration file.");
 		return FAIL;
 	}
 
@@ -466,7 +466,7 @@ int read_cs173_configuration(char *file, cs173_configuration_t *config) {
  *
  * @param err The error string to print out to stderr.
  */
-void print_error(char *err) {
+void cs173_print_error(char *err) {
 	fprintf(stderr, "An error has occurred while executing CS173. The error was:\n\n");
 	fprintf(stderr, "%s", err);
 	fprintf(stderr, "\n\nPlease contact software@scec.org and describe both the error and a bit\n");
@@ -496,7 +496,7 @@ int too_big() {
  * @return 2 if all files are read to memory, SUCCESS if file is found but at least 1
  * is not in memory, FAIL if no file found.
  */
-int try_reading_model(cs173_model_t *model) {
+int cs173_try_reading_model(cs173_model_t *model) {
 	double base_malloc = cs173_configuration->nx * cs173_configuration->ny * cs173_configuration->nz * sizeof(float);
 	int file_count = 0;
 	int all_read_to_memory =0;

@@ -118,7 +118,7 @@ typedef struct cs173_model_t {
 
 // Constants
 /** The version of the model. */
-const char *version_string = "CS173";
+const char *cs173_version_string = "CS173";
 
 // Variables
 /** Set to 1 when the model is ready for query. */
@@ -138,14 +138,14 @@ projPJ cs173_latlon;
 projPJ cs173_utm;
 
 /** The cosine of the rotation angle used to rotate the box and point around the bottom-left corner. */
-double cos_rotation_angle = 0;
+double cs173_cos_rotation_angle = 0;
 /** The sine of the rotation angle used to rotate the box and point around the bottom-left corner. */
-double sin_rotation_angle = 0;
+double cs173_sin_rotation_angle = 0;
 
 /** The height of this model's region, in meters. */
-double total_height_m = 0;
+double cs173_total_height_m = 0;
 /** The width of this model's region, in meters. */
-double total_width_m = 0;
+double cs173_total_width_m = 0;
 
 // UCVM API Required Functions
 
@@ -183,19 +183,19 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpts);
 /** Reads the configuration file. */
 int read_configuration(char *file, cs173_configuration_t *config);
 /** Prints out the error string. */
-void print_error(char *err);
+void cs173_print_error(char *err);
 /** Retrieves the value at a specified grid point in the model. */
-void read_properties(int x, int y, int z, cs173_properties_t *data);
+void cs173_read_properties(int x, int y, int z, cs173_properties_t *data);
 /** Attempts to malloc the model size in memory and read it in. */
-int try_reading_model(cs173_model_t *model);
+int cs173_try_reading_model(cs173_model_t *model);
 /** Calculates density from Vs. */
-double calculate_density(double vs);
+double cs173_calculate_density(double vs);
 
 // Interpolation Functions
 /** Linearly interpolates two cs173_properties_t structures */
-void linear_interpolation(double percent, cs173_properties_t *x0, cs173_properties_t *x1, cs173_properties_t *ret_properties);
+void cs173_linear_interpolation(double percent, cs173_properties_t *x0, cs173_properties_t *x1, cs173_properties_t *ret_properties);
 /** Bilinearly interpolates the properties. */
-void bilinear_interpolation(double x_percent, double y_percent, cs173_properties_t *four_points, cs173_properties_t *ret_properties);
+void cs173_bilinear_interpolation(double x_percent, double y_percent, cs173_properties_t *four_points, cs173_properties_t *ret_properties);
 /** Trilinearly interpolates the properties. */
-void trilinear_interpolation(double x_percent, double y_percent, double z_percent, cs173_properties_t *eight_points,
+void cs173_trilinear_interpolation(double x_percent, double y_percent, double z_percent, cs173_properties_t *eight_points,
 							 cs173_properties_t *ret_properties);
