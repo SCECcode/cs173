@@ -36,14 +36,14 @@ int cs173_init(const char *dir, const char *label) {
 	sprintf(configbuf, "%s/model/%s/data/config", dir, label);
 
 	// Read the cs173_configuration file.
-	if (read_cs173_configuration(configbuf, cs173_configuration) != SUCCESS)
+	if (cs173_read_configuration(configbuf, cs173_configuration) != SUCCESS)
 		return FAIL;
 
 	// Set up the iteration directory.
 	sprintf(cs173_iteration_directory, "%s/model/%s/data/%s/", dir, label, cs173_configuration->model_dir);
 
 	// Can we allocate the model, or parts of it, to memory. If so, we do.
-	tempVal = try_reading_model(cs173_velocity_model);
+	tempVal = cs173_try_reading_model(cs173_velocity_model);
 
 	if (tempVal == SUCCESS) {
 		fprintf(stderr, "WARNING: Could not load model into memory. Reading the model from the\n");
@@ -407,7 +407,7 @@ int cs173_version(char *ver, int len)
  * @param config The cs173_configuration struct to which the data should be written.
  * @return Success or failure, depending on if file was read successfully.
  */
-int read_cs173_configuration(char *file, cs173_configuration_t *config) {
+int cs173_read_configuration(char *file, cs173_configuration_t *config) {
 	FILE *fp = fopen(file, "r");
 	char key[40];
 	char value[80];
