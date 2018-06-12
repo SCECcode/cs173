@@ -19,17 +19,23 @@ install:
 
 clean:
 	rm -rf $(TARGETS)
-	rm -rf cs173.o utm_geo.o
+	rm -rf *.o
 
-libcs173.a: cs173_static.o 
+libcs173.a: cs173_static.o cs173_gtl_static.o
 	$(AR) rcs $@ $^
 
-libcs173.so: cs173.o 
+libcs173.so: cs173.o cs173_gtl.o
 	$(CC) -shared $(AM_FCFLAGS) -o libcs173.so $^ $(AM_LDFLAGS)
 
 cs173.o: cs173.c
 	$(CC) -fPIC -DDYNAMIC_LIBRARY -o $@ -c $^ $(AM_CFLAGS)
+
+cs173_gtl.o: cs173_gtl.c
+	$(CC) -fPIC -DDYNAMIC_LIBRARY -o $@ -c $^ $(AM_CFLAGS)
 	
 cs173_static.o: cs173.c
+	$(CC) -o $@ -c $^ $(AM_CFLAGS)
+
+cs173_gtl_static.o: cs173_gtl.c
 	$(CC) -o $@ -c $^ $(AM_CFLAGS)
 	

@@ -12,8 +12,40 @@
 
 #include "limits.h"
 #include "cs173.h"
+#include "cs173_gtl.h"
 #include "proj_api.h"
 
+
+// Constants
+/** The version of the model. */
+const char *cs173_version_string = "CS173";
+
+// Variables
+/** Set to 1 when the model is ready for query. */
+int cs173_is_initialized = 0;
+
+/** Location of En-Jui's latest iteration files. */
+char cs173_iteration_directory[128];
+
+/** Configuration parameters. */
+cs173_configuration_t *cs173_configuration;
+/** Holds pointers to the velocity model data OR indicates it can be read from file. */
+cs173_model_t *cs173_velocity_model;
+
+/** Proj.4 latitude longitude, WGS84 projection holder. */
+projPJ cs173_latlon;
+/** Proj.4 UTM projection holder. */
+projPJ cs173_utm;
+
+/** The cosine of the rotation angle used to rotate the box and point around the bottom-left corner. */
+double cs173_cos_rotation_angle = 0;
+/** The sine of the rotation angle used to rotate the box and point around the bottom-left corner. */
+double cs173_sin_rotation_angle = 0;
+
+/** The height of this model's region, in meters. */
+double cs173_total_height_m = 0;
+/** The width of this model's region, in meters. */
+double cs173_total_width_m = 0;
 /**
  * Initializes the CS173 plugin model within the UCVM framework. In order to initialize
  * the model, we must provide the UCVM install path and optionally a place in memory
@@ -31,9 +63,13 @@ int cs173_init(const char *dir, const char *label) {
 	// Initialize variables.
 	cs173_configuration = calloc(1, sizeof(cs173_configuration_t));
 	cs173_velocity_model = calloc(1, sizeof(cs173_model_t));
+        cs173_vs30_map = calloc(1, sizeof(cs173_vs30_map_config_t));
 
 	// Configuration file location.
 	sprintf(configbuf, "%s/model/%s/data/config", dir, label);
+
+        // Set up model directories.
+        sprintf(cs173_vs30_etree_file, "%s/model/ucvm/ucvm.e", dir);
 
 	// Read the cs173_configuration file.
 	if (cs173_read_configuration(configbuf, cs173_configuration) != SUCCESS)
@@ -53,6 +89,11 @@ int cs173_init(const char *dir, const char *label) {
 		return FAIL;
 	}
 
+        if (cs173_read_vs30_map(cs173_vs30_etree_file, cs173_vs30_map) != SUCCESS) {
+                cs173_print_error("Could not read the Vs30 map data from UCVM.");
+                return FAIL;
+        }
+
 	// We need to convert the point from lat, lon to UTM, let's set it up.
 	if (!(cs173_latlon = pj_init_plus("+proj=latlong +datum=WGS84"))) {
 		cs173_print_error("Could not set up latitude and longitude projection.");
@@ -62,6 +103,11 @@ int cs173_init(const char *dir, const char *label) {
 		cs173_print_error("Could not set up UTM projection.");
 		return FAIL;
 	}
+
+        if (!(cs173_aeqd = pj_init_plus(cs173_vs30_map->projection))) {
+                cs173_print_error("Could not set up AEQD projection.");
+                return FAIL;
+        }
 
 	// In order to simplify our calculations in the query, we want to rotate the box so that the bottom-left
 	// corner is at (0m,0m). Our box's height is total_height_m and total_width_m. We then rotate the
@@ -82,6 +128,10 @@ int cs173_init(const char *dir, const char *label) {
 						  pow(cs173_configuration->top_left_corner_e - cs173_configuration->bottom_left_corner_e, 2.0f));
 	cs173_total_width_m  = sqrt(pow(cs173_configuration->top_right_corner_n - cs173_configuration->top_left_corner_n, 2.0f) +
 						  pow(cs173_configuration->top_right_corner_e - cs173_configuration->top_left_corner_e, 2.0f));
+
+        // Get the cos and sin for the Vs30 map rotation.
+        cs173_cos_vs30_rotation_angle = cos(cs173_vs30_map->rotation * DEG_TO_RAD);
+        cs173_sin_vs30_rotation_angle = sin(cs173_vs30_map->rotation * DEG_TO_RAD);
 
 	// Let everyone know that we are initialized and ready for business.
 	cs173_is_initialized = 1;
@@ -193,6 +243,16 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 			data[i].qs = -1;
 			continue;
 		} else {
+                    if ((points[i].depth < cs173_configuration->depth_interval) && 
+                                                       (cs173_configuration->gtl == 1)) {
+                           cs173_get_vs30_based_gtl(&(points[i]), &(data[i]));
+                           if(strcmp(cs173_configuration->density,"vs") == 0) {
+                               data[i].rho=cs173_calculate_density(data[i].vs);
+                               } else {
+                                  data[i].rho=cs173_nafe_drake_rho(data[i].vp);
+                           }
+
+                      } else {
 			// Read all the surrounding point properties.
 			cs173_read_properties(load_x_coord,     load_y_coord,     load_z_coord,     &(surrounding_points[0]));	// Orgin.
 			cs173_read_properties(load_x_coord + 1, load_y_coord,     load_z_coord,     &(surrounding_points[1]));	// Orgin + 1x
@@ -204,6 +264,7 @@ int cs173_query(cs173_point_t *points, cs173_properties_t *data, int numpoints) 
 			cs173_read_properties(load_x_coord + 1, load_y_coord + 1, load_z_coord - 1, &(surrounding_points[7]));	// +x +y, forms bottom plane.
 
 			cs173_trilinear_interpolation(x_percent, y_percent, z_percent, surrounding_points, &(data[i]));
+                   }
 		}
 
 		// Calculate Qp and Qs.
@@ -442,6 +503,18 @@ int cs173_read_configuration(char *file, cs173_configuration_t *config) {
 			if (strcmp(key, "depth_interval") == 0)		config->depth_interval = atof(value);
 			if (strcmp(key, "seek_axis") == 0)		sprintf(config->seek_axis, "%s", value);
 			if (strcmp(key, "seek_direction") == 0)		sprintf(config->seek_direction, "%s", value);
+			if (strcmp(key, "p0") == 0)                                             config->p0 = atof(value);
+                        if (strcmp(key, "p1") == 0)                                             config->p1 = atof(value);
+                        if (strcmp(key, "p2") == 0)                                             config->p2 = atof(value);
+                        if (strcmp(key, "p3") == 0)                                             config->p3 = atof(value);
+                        if (strcmp(key, "p4") == 0)                                             config->p4 = atof(value);
+                        if (strcmp(key, "p5") == 0)                                             config->p5 = atof(value);
+			if (strcmp(key, "density") == 0)				sprintf(config->density, "%s", value);
+                        if (strcmp(key, "gtl") == 0) {
+                                if (strcmp(value, "on") == 0) config->gtl = 1;
+                                else config->gtl = 0;
+                        }
+
 		}
 	}
 
@@ -620,6 +693,38 @@ int cs173_try_reading_model(cs173_model_t *model) {
 	else
 		return 2;
 }
+
+/**
+ * Calculates the density based off of Vs. Based on Nafe-Drake scaling relationship.
+ * 
+ * @param vs The Vs value off which to scale.
+ * @return Density, in g/m^3.
+ **/
+double cs173_calculate_density(double vs) {
+        double retVal;
+        vs = vs / 1000;
+        retVal = cs173_configuration->p0 + cs173_configuration->p1 * vs + cs173_configuration->p2 * pow(vs, 2) +
+                         cs173_configuration->p3 * pow(vs, 3) + cs173_configuration->p4 * pow(vs, 4) + cs173_configuration->p5 * pow(vs, 5);
+        retVal = retVal * 1000;
+        return retVal;
+}
+/**
+ * Calculates the density based off of Vp. Derived from Vp via Nafe-Drake curve, Brocher (2005) eqn 1. 
+ * @param vs The Vs value off which to scale.
+ * @return Density, in g/m^3.
+ **/
+double cs173_nafe_drake_rho(double vp) {
+  double rho;
+  /* Convert m to km */
+  vp = vp * 0.001;
+  rho = vp * (1.6612 - vp * (0.4721 - vp * (0.0671 - vp * (0.0043 - vp * 0.000106))));
+  if (rho < 1.0) {
+    rho = 1.0;
+  }
+  rho = rho * 1000.0;
+  return(rho);
+}
+
 
 // The following functions are for dynamic library mode. If we are compiling
 // a static library, these functions must be disabled to avoid conflicts.

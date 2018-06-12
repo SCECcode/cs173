@@ -4,6 +4,9 @@ utm_zone = 11
 # Model directory
 model_dir = cs173
 
+# GTL on or off?
+gtl = off 
+
 # Number of cells in x, y, and z.
 nx = 3200 
 ny = 6960 
@@ -12,6 +15,17 @@ nz = 288
 # Depth, in meters
 depth = 50400
 depth_interval = 175
+
+# Density scaling parameters
+p5 = -0.0024189659303912917
+p4 = 0.015600987888334450
+p3 = 0.051962399479341816
+p2 = -0.51231936640441489
+p1 = 1.2550758337054457
+p0 = 1.2948318548300342
+ 
+# # Calculate Density using vs or vp ?
+density = vs
 
 bottom_left_corner_e = 548969.079292
 bottom_left_corner_n = 3459243.769232

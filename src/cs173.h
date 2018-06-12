@@ -53,12 +53,14 @@ typedef struct cs173_properties_t {
 	double qs;
 } cs173_properties_t;
 
-/** The CVM-S5 configuration structure. */
+/** The CS173 configuration structure. */
 typedef struct cs173_configuration_t {
 	/** The zone of UTM projection */
 	int utm_zone;
 	/** The model directory */
 	char model_dir[128];
+        /** GTL on or off (1 or 0) */
+        int gtl;
 	/** Number of x points */
 	int nx;
 	/** Number of y points */
@@ -89,7 +91,20 @@ typedef struct cs173_configuration_t {
 	char seek_axis[128];
 	/** The data seek direction, bottom-up, or top-down */
 	char seek_direction[128];
-	/** Number of x points */
+	/**  using vs or vp*/
+	char density[128];
+        /** Brocher 2005 scaling polynomial coefficient 10^0 */
+        double p0;
+        /** Brocher 2005 scaling polynomial coefficient 10^1 */
+        double p1;
+        /** Brocher 2005 scaling polynomial coefficient 10^2 */
+        double p2;
+        /** Brocher 2005 scaling polynomial coefficient 10^3 */
+        double p3;
+        /** Brocher 2005 scaling polynomial coefficient 10^4 */
+        double p4;
+        /** Brocher 2005 scaling polynomial coefficient 10^5 */
+        double p5;
 } cs173_configuration_t;
 
 /** The model structure which points to available portions of the model. */
@@ -116,36 +131,6 @@ typedef struct cs173_model_t {
 	int qs_status;
 } cs173_model_t;
 
-// Constants
-/** The version of the model. */
-const char *cs173_version_string = "CS173";
-
-// Variables
-/** Set to 1 when the model is ready for query. */
-int cs173_is_initialized = 0;
-
-/** Location of En-Jui's latest iteration files. */
-char cs173_iteration_directory[128];
-
-/** Configuration parameters. */
-cs173_configuration_t *cs173_configuration;
-/** Holds pointers to the velocity model data OR indicates it can be read from file. */
-cs173_model_t *cs173_velocity_model;
-
-/** Proj.4 latitude longitude, WGS84 projection holder. */
-projPJ cs173_latlon;
-/** Proj.4 UTM projection holder. */
-projPJ cs173_utm;
-
-/** The cosine of the rotation angle used to rotate the box and point around the bottom-left corner. */
-double cs173_cos_rotation_angle = 0;
-/** The sine of the rotation angle used to rotate the box and point around the bottom-left corner. */
-double cs173_sin_rotation_angle = 0;
-
-/** The height of this model's region, in meters. */
-double cs173_total_height_m = 0;
-/** The width of this model's region, in meters. */
-double cs173_total_width_m = 0;
 
 // UCVM API Required Functions
 
@@ -190,6 +175,8 @@ void cs173_read_properties(int x, int y, int z, cs173_properties_t *data);
 int cs173_try_reading_model(cs173_model_t *model);
 /** Calculates density from Vs. */
 double cs173_calculate_density(double vs);
+/** Calculates density from Vp. */
+double cs173_nafe_drake_rho(double vp);
 
 // Interpolation Functions
 /** Linearly interpolates two cs173_properties_t structures */
@@ -199,3 +186,22 @@ void cs173_bilinear_interpolation(double x_percent, double y_percent, cs173_prop
 /** Trilinearly interpolates the properties. */
 void cs173_trilinear_interpolation(double x_percent, double y_percent, double z_percent, cs173_properties_t *eight_points,
 							 cs173_properties_t *ret_properties);
+
+
+/** Configuration parameters. */
+extern cs173_configuration_t *cs173_configuration;
+/** Proj.4 latitude longitude, WGS84 projection holder. */
+extern projPJ cs173_latlon;
+/** Proj.4 UTM projection holder. */
+extern projPJ cs173_utm;
+
+/** The cosine of the rotation angle used to rotate the box and point around the bottom-left corner. */
+extern double cs173_cos_rotation_angle;
+/** The sine of the rotation angle used to rotate the box and point around the bottom-left corner. */
+extern double cs173_sin_rotation_angle;
+
+/** The height of this model's region, in meters. */
+extern double cs173_total_height_m;
+/** The width of this model's region, in meters. */
+extern double cs173_total_width_m;
+
